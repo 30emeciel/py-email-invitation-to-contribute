@@ -1,0 +1,17 @@
+steps:
+  - name: "gcr.io/trentiemeciel/poetry-builder"
+    args: ["export", "--format", "requirements.txt", "--output", "requirements.txt", "--without-hashes"]
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: "gcloud"
+    args:
+    - functions
+    - deploy
+    - email-invitation-to-contribute
+    - --project=trentiemeciel
+    - --source=.  
+    - --region=europe-west3
+    - --entry-point=from_pubsub
+    - --runtime=python39
+    - --memory=128
+    - --trigger-topic=email-invitation-to-contribute
+    
