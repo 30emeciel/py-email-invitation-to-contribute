@@ -6,7 +6,7 @@ authors = ["30ème Ciel <admin@30emeciel.fr>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-core = { git = "https://github.com/30emeciel/py-core.git", branch="v2"}
+core = { git = "https://github.com/30emeciel/py-core.git", branch="3"}
 # core = { path = "../py-core", develop = true }
 # core = { path = "../py-core", develop = false }
 python-box = "^5.3.0"
