@@ -6,14 +6,16 @@ authors = ["30ème Ciel <admin@30emeciel.fr>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-core = { git = "https://github.com/30emeciel/py-core.git", branch="3"}
+core = { git = "https://github.com/30emeciel/py-core.git", branch="4"}
 # core = { path = "../py-core", develop = true }
 # core = { path = "../py-core", develop = false }
 python-box = "^5.3.0"
 google-cloud-pubsub = "^2.4.1"
+pytest = "^6.2.4"
+pytest-mockito = "^0.0.4"
 
 [tool.poetry.dev-dependencies]
-python-dotenv = "^0.17.0"
+python-dotenv = "^0.17.1"
 
 
 [build-system]

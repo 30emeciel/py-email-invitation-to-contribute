@@ -5,10 +5,45 @@
 Salut {{pax.name}} 🌸
 
 
-Si tu reçois ce mail c'est que tu as passé 1 ou plusieurs nuits au 30ème Ciel ☺
 Merci beaucoup pour ta présence avec nous ❤.
 
-D'après tes réservations, tu as passé {{request.number_of_nights}} nuits au 30ème Ciel.
+{% for kind, items in reservations|groupby("kind") %}
+{% if kind == "COLIVING" %}
+{% set len_coliving = items|length %}
+D'après tes réservations, tu as passé au total {{ len_coliving }} nuit{{ s|pluralize(len_coliving) }} au Coliving au 30ème Ciel.
+
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+   :align: center
+
+   * - Début
+     - Fin
+     - Nombre de nuits
+{%- for r in items %}
+   * - {{r.arrival_date|dateformat}}
+     - {{r.departure_date|dateformat}}
+     - {{r.number_of_nights}}
+{% endfor %}
+
+{% else %}
+{% set len_coworking = items|length -%}
+D'après tes réservations, tu as passé au total {{ len_coworking }} jour{{ len_coworking|pluralize(c) }} de Coworking au 30ème Ciel.
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+   :align: center
+
+   * - Date
+{%- for r in items %}
+   * - {{r.arrival_date|dateformat}}
+{% endfor %}
+
+{% endif %}
+{% endfor %}
+
 Si tu souhaites contribuer au projet, c'est par ici:
 https://www.30emeciel.fr/cc/contributing/
 

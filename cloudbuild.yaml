@@ -1,14 +1,21 @@
 steps:
   - name: "gcr.io/trentiemeciel/poetry-builder"
     args: ["export", "--format", "requirements.txt", "--output", "requirements.txt", "--without-hashes"]
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gsutil'
+    args:
+      - cp
+      - gs://env-config.30emeciel.fr/live.yaml
+      - env.yaml
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: "gcloud"
     args:
     - functions
     - deploy
     - email-invitation-to-contribute
     - --project=trentiemeciel
-    - --source=.  
+    - --env-vars-file=env.yaml
+    - --source=.
     - --region=europe-west3
     - --entry-point=from_pubsub
     - --runtime=python39

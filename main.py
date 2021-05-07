@@ -1,15 +1,21 @@
 import base64
-import json
 import logging
 import os
+import pickle
 from datetime import datetime, timezone, timedelta
 
 from box import Box
-from core.tpl import render
+from core import firestore_client
+from core.mailer import Mailer
 from core.rst_to_html import to_html
-from core.mail import send_mail
-from core.firestore_client import db
+from core.tpl import render
+from firebase_admin import firestore
 from google.cloud import pubsub_v1
+
+PARIS_TZ = timezone(timedelta(hours=2))
+
+db = firestore_client.db()
+mailer = Mailer()
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +24,8 @@ TOPIC_NAME = "email-invitation-to-contribute"
 
 publisher = pubsub_v1.PublisherClient()
 full_topic_name = f'projects/{PROJECT_ID}/topics/{TOPIC_NAME}'
+
+PAX_REF_PATH = "reservation_doc_path"
 
 
 def from_pubsub(event, context):
@@ -28,60 +36,95 @@ def from_pubsub(event, context):
     """
     log.debug("""This Function was triggered by messageId {} published at {}
        """.format(context.event_id, context.timestamp))
+    log.debug(f"event={event}")
     event = Box(event)
-    if 'data' in event:
-        pubsub_message = base64.b64decode(event.data).decode('utf-8')
-        log.debug(pubsub_message)
-        obj = Box(json.loads(pubsub_message))
-        departure_path_id = obj.get("departure_path_id")
-        if departure_path_id:
-            deferred_email_invitation_to_contribute(departure_path_id)
-        else:
-            log.warning(f"Invalid message. Missing departure_path_id field")
+    pubsub_message = base64.b64decode(event.data)
+    log.debug(f"pubsub_message={pubsub_message}")
+    args = pickle.loads(pubsub_message)
+    if args:
+        deferred_email_invitation_to_contribute(*args)
     else:
         email_invitation_to_contribute()
 
 
-def defer_email_invitation_to_contribue(departure):
-    msg = {
-        "departure_path_id": departure.reference.path
-    }
-    msg_json = json.dumps(msg)
-    future = publisher.publish(full_topic_name, base64.b64encode(msg_json.encode("utf-8")))
+def defer_email_invitation_to_contribue(pax_ref_path, a_while_ago):
+    args = pickle.dumps([pax_ref_path, a_while_ago])
+    future = publisher.publish(full_topic_name, base64.b64encode(args))
     return future
 
 
-def deferred_email_invitation_to_contribute(departure_path_id):
-    log.info(f"departure_path_id={departure_path_id}")
-    request_doc = db.document(departure_path_id).get()
-    assert request_doc.exists
-    request = Box(request_doc.to_dict())
-    pax_doc = request_doc.reference.parent.parent.get()
+def deferred_email_invitation_to_contribute(pax_ref_path, a_while_ago):
+    tx = db.transaction()
+    deferred_tx_email_invitation_to_contribute(tx, pax_ref_path, a_while_ago)
+
+
+@firestore.transactional
+def deferred_tx_email_invitation_to_contribute(tx, pax_ref_path, a_while_ago):
+    log.info(f"pax_ref_path={pax_ref_path} a_while_ago={a_while_ago}")
+    pax_ref = db.document(pax_ref_path)
+
+    pax_doc = pax_ref.get()
+    assert pax_doc.exists
+
+    pax_reservation_collection_ref = pax_ref.collection('requests')
+
+    reservations_query = common_criteria(
+        pax_reservation_collection_ref,
+        a_while_ago) \
+        .stream(transaction=tx)
+
     pax = Box(pax_doc.to_dict())
+    reservation_docs = list(reservations_query)
+    reservations = [Box(reservation_doc.to_dict()) for reservation_doc in reservation_docs]
+    log.info(
+        f"pax_ref_path={pax_ref_path} a_while_ago={a_while_ago} "
+        f"pax.name={pax.name} pax_doc.id={pax_doc.id} len(reservations)={len(reservation_docs)}")
+
+    if not reservations:
+        log.warning(f"We came here but to find out there is no reservations to invite for contribution!")
+        return
+
     data = {
         "pax": pax,
-        "request": request,
+        "reservations": reservations,
     }
-    rst = render("invitation_to_contribute_fr.rst", data)
-    title = render("invitation_to_contribute_title_fr.txt", data)
+
+    rst = render(f"invitation_to_contribute_fr.rst", data)
+    title = render(f"invitation_to_contribute_title_fr.txt", data)
 
     html = to_html(rst)
 
-    send_mail(f"{pax.name} <{pax.email}>", title, html)
+    mailer.send_mail(pax.name, pax.email, title, html)
+
+    for reservation_doc in reservation_docs:
+        tx.update(reservation_doc.reference, {
+            "contribution_state": "EMAILED",
+        })
+    pass
+
+
+def common_criteria(query, a_while_ago):
+    return query \
+        .where('state', "==", "CONFIRMED") \
+        .where('contribution_state', "==", "START") \
+        .where('departure_date', '<', a_while_ago)  \
+        .order_by('departure_date', 'ASCENDING')
 
 
 def email_invitation_to_contribute():
     # TODO: fix timestamp in DB!
-    a_while_ago = datetime.now(tz=timezone(timedelta(hours=2)))        \
+    a_while_ago = datetime.now(tz=PARIS_TZ)        \
         .replace(hour=0, minute=0, second=0, microsecond=0)             \
         - timedelta(days=2)
 
-    request_departures = db.collection_group('requests') \
-        .where('state', "==", "CONFIRMED") \
-        .where('departure_date', '==', a_while_ago) \
-        .stream()
+    reservations_query = common_criteria(
+        db.collection_group('requests'),
+        a_while_ago,
+    ).select([]).stream()
 
-    futures = (defer_email_invitation_to_contribue(departure) for departure in request_departures)
+    pax_ref_list = set(reservation_doc.reference.parent.parent for reservation_doc in reservations_query)
+
+    futures = (defer_email_invitation_to_contribue(pax_ref.path, a_while_ago) for pax_ref in pax_ref_list)
     for future in futures:
-        ret = future.result()
-        pass
+        future.result()
+    pass
