@@ -3,6 +3,7 @@ import logging
 import os
 import pickle
 from datetime import datetime, timezone, timedelta
+from pickle import PickleError, UnpicklingError
 
 from box import Box
 from core import firestore_client
@@ -40,11 +41,17 @@ def from_pubsub(event, context):
     event = Box(event)
     pubsub_message = base64.b64decode(event.data)
     log.debug(f"pubsub_message={pubsub_message}")
-    args = pickle.loads(pubsub_message)
+    args = None
+    try:
+        args = pickle.loads(pubsub_message)
+    except UnpicklingError as e:
+        log.info("no args, running default action", exc_info=e)
+        email_invitation_to_contribute()
+
     if args:
         deferred_email_invitation_to_contribute(*args)
     else:
-        email_invitation_to_contribute()
+        log.warning(f"Invalid args")
 
 
 def defer_email_invitation_to_contribue(pax_ref_path, a_while_ago):
