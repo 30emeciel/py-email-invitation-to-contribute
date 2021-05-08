@@ -41,10 +41,10 @@ def from_pubsub(event, context):
        """.format(context.event_id, context.timestamp))
     log.debug(f"event={event}")
     event = Box(event)
-    pubsub_message = event.data
+    pubsub_message: str = event.data
     log.debug(f"pubsub_message={pubsub_message}")
     try:
-        args = json.loads(pubsub_message.decode("utf-8"))
+        args = json.loads(base64.b64decode(pubsub_message))
     except JSONDecodeError as e:
         log.warning("no args, running default action", exc_info=e)
         return
