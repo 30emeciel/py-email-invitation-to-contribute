@@ -1,8 +1,10 @@
 import base64
+import json
 import logging
 import os
 import pickle
 from datetime import datetime, timezone, timedelta
+from json import JSONDecodeError
 from pickle import PickleError, UnpicklingError
 
 from box import Box
@@ -39,28 +41,28 @@ def from_pubsub(event, context):
        """.format(context.event_id, context.timestamp))
     log.debug(f"event={event}")
     event = Box(event)
-    pubsub_message = base64.b64decode(event.data)
+    pubsub_message = event.data
     log.debug(f"pubsub_message={pubsub_message}")
-    args = None
     try:
-        args = pickle.loads(pubsub_message)
-    except UnpicklingError as e:
-        log.info("no args, running default action", exc_info=e)
-        email_invitation_to_contribute()
+        args = json.loads(pubsub_message.decode("utf-8"))
+    except JSONDecodeError as e:
+        log.warning("no args, running default action", exc_info=e)
+        return
 
     if args:
         deferred_email_invitation_to_contribute(*args)
     else:
-        log.warning(f"Invalid args")
+        email_invitation_to_contribute()
 
 
 def defer_email_invitation_to_contribue(pax_ref_path, a_while_ago):
-    args = pickle.dumps([pax_ref_path, a_while_ago])
-    future = publisher.publish(full_topic_name, base64.b64encode(args))
+    args = json.dumps([pax_ref_path, a_while_ago.timestamp()])
+    future = publisher.publish(full_topic_name, args.encode("utf-8"))
     return future
 
 
-def deferred_email_invitation_to_contribute(pax_ref_path, a_while_ago):
+def deferred_email_invitation_to_contribute(pax_ref_path, a_while_ago_ts):
+    a_while_ago = datetime.fromtimestamp(a_while_ago_ts)
     tx = db.transaction()
     deferred_tx_email_invitation_to_contribute(tx, pax_ref_path, a_while_ago)
 

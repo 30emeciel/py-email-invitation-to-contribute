@@ -66,11 +66,11 @@ def test_from_pubsub(when, patch):
     from main import from_pubsub
     args = [
         'pax/auth0|5ff87d92a54dd0006f957407',
-        datetime(2021, 5, 5, 00, 00, 00, tzinfo=timezone(timedelta(hours=2)))
+        datetime(2021, 5, 5, 00, 00, 00, tzinfo=timezone(timedelta(hours=2))).timestamp()
     ]
 
     event = {
-        "data": base64.b64encode(pickle.dumps(args))
+        "data": json.dumps(args).encode("utf-8")
     }
     context = Box({
         "event_id": "event_id",
