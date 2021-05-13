@@ -70,7 +70,7 @@ def test_from_pubsub(when, patch):
     ]
 
     event = {
-        "data": json.dumps(args).encode("utf-8")
+        "data": base64.b64encode(json.dumps(args).encode("utf-8"))
     }
     context = Box({
         "event_id": "event_id",

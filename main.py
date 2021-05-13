@@ -2,10 +2,8 @@ import base64
 import json
 import logging
 import os
-import pickle
 from datetime import datetime, timezone, timedelta
 from json import JSONDecodeError
-from pickle import PickleError, UnpicklingError
 
 from box import Box
 from core import firestore_client
@@ -83,6 +81,7 @@ def deferred_tx_email_invitation_to_contribute(tx, pax_ref_path, a_while_ago):
         .stream(transaction=tx)
 
     pax = Box(pax_doc.to_dict())
+    log.info(f"Processing pax {pax.name}")
     reservation_docs = list(reservations_query)
     reservations = [Box(reservation_doc.to_dict()) for reservation_doc in reservation_docs]
     log.info(
@@ -92,6 +91,8 @@ def deferred_tx_email_invitation_to_contribute(tx, pax_ref_path, a_while_ago):
     if not reservations:
         log.warning(f"We came here but to find out there is no reservations to invite for contribution!")
         return
+
+    log.info(f"Found {len(reservations)} reservations")
 
     data = {
         "pax": pax,
@@ -134,6 +135,8 @@ def email_invitation_to_contribute():
     pax_ref_list = set(reservation_doc.reference.parent.parent for reservation_doc in reservations_query)
 
     futures = (defer_email_invitation_to_contribue(pax_ref.path, a_while_ago) for pax_ref in pax_ref_list)
-    for future in futures:
-        future.result()
-    pass
+    results = (future.result() for future in futures)
+    num_results = len(list(results))
+
+    assert num_results == len(pax_ref_list)
+    log.info(f"Kicked off {num_results} jobs.")
