@@ -19,6 +19,7 @@ steps:
     - --region=europe-west3
     - --entry-point=from_pubsub
     - --runtime=python39
-    - --memory=128
+    - --memory=256
+    - --max-instances=1
     - --trigger-topic=email-invitation-to-contribute
     
