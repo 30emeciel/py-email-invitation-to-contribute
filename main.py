@@ -126,6 +126,10 @@ def email_invitation_to_contribute():
     a_while_ago = datetime.now(tz=PARIS_TZ)        \
         .replace(hour=0, minute=0, second=0, microsecond=0)             \
         - timedelta(days=2)
+    email_invitation_to_contribute_sub(a_while_ago)
+
+
+def email_invitation_to_contribute_sub(a_while_ago):
 
     reservations_query = common_criteria(
         db.collection_group('requests'),

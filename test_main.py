@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import pickle
 from datetime import datetime, timezone, timedelta
 
@@ -17,6 +18,7 @@ from mockito import mock
 @pytest.fixture(autouse=True)
 def setup():
     dotenv.load_dotenv()
+    logging.basicConfig(level=logging.DEBUG)
 
 
 @pytest.fixture(autouse=False)
@@ -28,11 +30,17 @@ def db(when):
 
 def test_email_invitation_to_contribute(when):
     import main
+    when(main).test_email_invitation_to_contribute_sub(...).thenReturn()
+    main.email_invitation_to_contribute()
+
+
+def test_email_invitation_to_contribute_sub(when):
+    import main
     future = mock(Future)
     when(main).defer_email_invitation_to_contribue(...).thenReturn(future)
     when(future).result().thenReturn()
-    # a_while_ago = datetime(2021, 5, 5, 00, 00, 00, tzinfo=timezone(timedelta(hours=2)))
-    main.email_invitation_to_contribute()
+    a_while_ago = datetime(2021, 5, 17, 00, 00, 00, tzinfo=timezone(timedelta(hours=2)))
+    main.email_invitation_to_contribute_sub(a_while_ago)
 
 
 def test_defer_invitation_to_contribute(when):
@@ -41,7 +49,7 @@ def test_defer_invitation_to_contribute(when):
     import main
     main.defer_email_invitation_to_contribue(
         'pax/auth0|60944beb668f990071383b74',
-        datetime(2021, 5, 5, 00, 00, 00, tzinfo=timezone(timedelta(hours=2)))
+        datetime(2021, 5, 17, 00, 00, 00, tzinfo=timezone(timedelta(hours=2)))
     )
 
 
@@ -54,8 +62,8 @@ def test_deferred_email_invitation_to_contribute(when, patch):
     patch(Mailer.send_mail, lambda pax_name, pax_email, title, html: _write_html(html))
     import main
     main.deferred_email_invitation_to_contribute(
-        'pax/auth0|5ff87d92a54dd0006f957407',
-        datetime(2021, 5, 5, 00, 00, 00, tzinfo=timezone(timedelta(hours=2)))
+        'pax/facebook|10158345316923099',
+        datetime(2021, 5, 17, 00, 00, 00, tzinfo=timezone(timedelta(hours=2))).timestamp()
     )
     #'pax/google-oauth2|107336710838050909583/requests/KHQpVVu1H7Hvn3jLwX01')
 
